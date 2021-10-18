@@ -37,7 +37,18 @@ class EnergyData:
         df = df.rename(columns={'Quantity': 'Quantity (1e6 kW/h)'})
         df.drop(columns = ['Commodity - Transaction', 'Quantity Footnotes'], 
                 inplace=True)
+        
+        # drop values for 2019 because incomplete
+        df = df[df['Year']!=2019]
+        
+        # create a map of transactions and transaction codes
+        transaction_map = {}
+        for t in df['Transaction'].unique():
+            transaction_map[t] = df['Transaction Code'][df['Transaction']==t].unique()[0]
+        
         self.data = df
+        self.transaction_map = transaction_map
+
         
         
     def extract_generation_data(self, years=None, transactions=None, codes=False):
