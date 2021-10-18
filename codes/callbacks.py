@@ -114,17 +114,8 @@ def build_world_data(energyData, year, transaction):
     df_plot: pandas.DataFrame
         The cleaned and filtered dataset for plotting.
     '''
-    
-    try:
-        df_plot = energyData.data[(energyData.data['Year'] == year) & (energyData.data['Transaction Code'] == transaction)]
-    except Exception as e:
-        print(e)
-        raise ValueError(print(e))
-        
-        # df_plot = energyData.data[(energyData.data['Year'] == year) & (energyData.data['Transaction'] == transaction)]
-    # else:
-    #     raise ValueError(f'Cannot parse transaction {transaction}')
-    
+
+    df_plot = energyData.data[(energyData.data['Year'] == year) & (energyData.data['Transaction Code'] == transaction)]
     df_plot['ISO-3'] = coco.convert(df_plot['Country or Area'], to='ISO3')
     
     return df_plot
