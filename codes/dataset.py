@@ -21,23 +21,21 @@ class EnergyData:
         transform_generation_data
         transform_consumption_data
         '''
-        df = pd.read_csv(filename, dtype={'Commodity Code': 'str', 
+        df = pd.read_csv(filename, dtype={
                                         'Country or Area Code': np.int32,
                                         'Country or Area': 'str', 
                                         'Transaction Code': 'str', 
-                                        'Commodity - Transaction Code': 'str',
                                         'Commodity - Transaction': 'str',
                                         'Year': np.int32,
-                                        'Unit': 'str',
                                         'Quantity': np.float64,
                                         'Quantity Footnotes': np.float64},
                          skipfooter=2)
-        # clean up the data: drop columns with only one value (commodity)
+        # clean up the data:
         # substitute commodity - transaction with transaction only
         # quantity footnotes indicate estimates and we're not using them here, so will drop them as well
         df['Transaction'] = df['Commodity - Transaction'].apply(lambda x: x.split(' - ')[-1])
-        df = df.rename(columns={'Quantity': 'Quantity (1e6 kW/h)'}).drop(columns='Unit')
-        df.drop(columns = ['Commodity Code', 'Commodity - Transaction Code', 'Commodity - Transaction', 'Quantity Footnotes'], 
+        df = df.rename(columns={'Quantity': 'Quantity (1e6 kW/h)'})
+        df.drop(columns = ['Commodity - Transaction', 'Quantity Footnotes'], 
                 inplace=True)
         self.data = df
         
@@ -71,7 +69,7 @@ class EnergyData:
         # The production data have transaction codes starting with 01.
         # The transaction code for total production - main activity is EP
         # The Transaction code for total production - autoproducer is SP
-        df_production = self.data[self.data['Transaction Code'].str.contains("01.*?|EP|SP")].groupby(
+        df_production = self.data[self.data['Transaction Code'].str.contains("^01.*?|EP|SP")].groupby(
                 by=columns, as_index=True).sum().drop(
                 columns=['Country or Area Code'])
         
@@ -115,7 +113,7 @@ class EnergyData:
         
         # The consumption data have transaction codes starting with 12.
 
-        df_consumption = self.data[self.data['Transaction Code'].str.contains("12.*?")].groupby(
+        df_consumption = self.data[self.data['Transaction Code'].str.contains("^12.*?")].groupby(
                 by=columns, as_index=True).sum().drop(
                 columns=['Country or Area Code'])
         
@@ -187,7 +185,7 @@ class EnergyData:
         Returns
         -------
         purpose_map: dict
-            A mapping between the codes and purposes.
+            A mapping between the codes and purposes (main activity vs autoproducer).
         '''
         purpose_map = {}
         for code in codes:

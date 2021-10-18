@@ -1,6 +1,7 @@
 from . import dataset
+import country_converter as coco
 
-def build_production_dataset(energyData, years, transactions, codes):
+def build_production_dataset(energyData, year, transactions, codes):
     '''
     Filters the dataset to extract data on electricty generation and transforms 
     it for plotting.
@@ -9,8 +10,8 @@ def build_production_dataset(energyData, years, transactions, codes):
     ----------
     energyData: dataset.EnergyData object
         The full dataset on electricity
-    years: int, list
-        A year or list of years to filter the data set on. 
+    year: int
+        A year to filter the data set on. 
     transactions: str, list
         A transaction or list of transactions to filter the data set on.
     codes: bool
@@ -23,20 +24,26 @@ def build_production_dataset(energyData, years, transactions, codes):
         The cleaned and transformed dataset, containing columns on % of total production,
         named fuels and generation purpose tags for main activity vs autoproducer.
     '''
-    df_production = energyData.extract_generation_data(years=years, 
+    df_production = energyData.extract_generation_data(years=year, 
                                                        transactions=transactions,
                                                        codes=codes)
 
-    # Compute the total production as a sum of total production from main activity and autoproducers
-    # Note: even though there are values for gross and net production in the table, they don't add up to EP + SP
-    # and since we're displaying the main activity and autoproducers in the bar chart, this total is most suitable
-    total_production = df_production['Quantity (1e6 kW/h)'].loc[:,'EP']+df_production['Quantity (1e6 kW/h)'].loc[:,'SP']
-    # add columns for % of total energy production
-    df_production['% of total'] = df_production['Quantity (1e6 kW/h)'].apply(lambda x: 100*x/total_production)
-    # 
     # clean and transform data set with features needed for plotting
     df_plot = df_production.reset_index()
+    
+    # add rows for 'Other' main activity and autoproducers (to sum to 100% in pie chart)
+    total_EP_fuels = df_plot['Quantity (1e6 kW/h)'][df_plot['Transaction Code'].str.contains("^015.*?")].sum()
+    total_SP_fuels = df_plot['Quantity (1e6 kW/h)'][df_plot['Transaction Code'].str.contains("^016.*?")].sum()
+    df_plot = df_plot.append({'Year': year, 
+                'Transaction Code': '015O', 
+                'Quantity (1e6 kW/h)': (df_production['Quantity (1e6 kW/h)'].loc[:,'EP'].values - total_EP_fuels)[0]},
+              ignore_index=True)
+    df_plot = df_plot.append({'Year': year, 
+                    'Transaction Code': '016O', 
+                    'Quantity (1e6 kW/h)': (df_production['Quantity (1e6 kW/h)'].loc[:,'SP'].values - total_SP_fuels)[0]},
+                ignore_index=True)
 
+    # add columns for fuel and generation purposes
     fuel_map = dataset.EnergyData.map_code_to_fuel(df_plot['Transaction Code'])
     purpose_map = dataset.EnergyData.map_code_to_purpose(df_plot['Transaction Code'])
 
@@ -68,6 +75,8 @@ def build_consumption_dataset(energyData, years):
     df_plot: pandas.DataFrame
         The cleaned and transformed dataset, with transaction codes mapped to consumer tags.
     '''
+    
+    # TODO: generalize to entire set (the implementation below only focuces on case study)
     consumer_map = {'1231': 'Households', 
                     '121': 'Industry', 
                     '122': 'Transport', 
@@ -83,3 +92,42 @@ def build_consumption_dataset(energyData, years):
     df_plot['Consumer'] = df_plot['Transaction Code'].map(consumer_map)
     return df_plot
     
+    
+def build_world_data(energyData, year, transaction):
+    '''
+    Filters the dataset to extract per-country data for a given year and transaction.
+    
+    energyData: dataset.EnergyData object
+        The full dataset on electricity
+    year: int
+        A year to filter the data set on. 
+    transactions: str, list
+        A transaction or list of transactions to filter the data set on.
+    
+    Raises
+    ------
+    ValueError
+        If passed value for transaction does not match any Transaction or Transaction Code in the dataset.
+        
+    Returns
+    -------
+    df_plot: pandas.DataFrame
+        The cleaned and filtered dataset for plotting.
+    '''
+    
+    try:
+        df_plot = energyData.data[(energyData.data['Year'] == year) & (energyData.data['Transaction Code'] == transaction)]
+    except Exception as e:
+        print(e)
+        raise ValueError(print(e))
+        
+        # df_plot = energyData.data[(energyData.data['Year'] == year) & (energyData.data['Transaction'] == transaction)]
+    # else:
+    #     raise ValueError(f'Cannot parse transaction {transaction}')
+    
+    df_plot['ISO-3'] = coco.convert(df_plot['Country or Area'], to='ISO3')
+    
+    return df_plot
+    
+    
+        
